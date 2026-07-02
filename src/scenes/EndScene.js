@@ -1,5 +1,5 @@
 import { submitScore, getTopScores, leaderboardIsShared } from '../services/leaderboard.js';
-import { markGameBeaten } from '../services/progress.js';
+import { markGameBeaten, saveLastScorecard } from '../services/progress.js';
 import { isTouchDevice } from '../ui/touchControls.js';
 import { addFullscreenButton } from '../ui/fullscreen.js';
 
@@ -22,6 +22,8 @@ export class EndScene extends Phaser.Scene {
 
     // Reaching the End screen means the game was beaten — unlock stage select.
     markGameBeaten();
+    // Keep this run's scorecard so it can be viewed again from stage select.
+    saveLastScorecard(this.results);
 
     // Drop the gameplay key captures (W/A/S/D/F, arrows, space) so name entry
     // below reads plain keystrokes without the run's control bindings interfering.
