@@ -73,7 +73,7 @@ export const ENEMY_TYPES = {
   },
   // Pigeon (Skate Park). Two variants share one sheet: a grounded one that walks
   // back and forth, hops, and breaks into a run; and a swooping one that starts
-  // airborne and dive-bombs the player. Left-facing sheet.
+  // airborne and dive-bombs the player. Right-facing sheet.
   pigeon: {
     art: 'sheet',
     texture: PIGEON_TEXTURE,
@@ -81,7 +81,6 @@ export const ENEMY_TYPES = {
     anims: { idle: 'pigeon-idle', walk: 'pigeon-walk', fly: 'pigeon-fly' },
     size: 68,
     motion: 'pwalk',
-    facing: 'left',
     box: { w: 88, h: 92, ox: 42, oy: 58 }
   },
   pigeonFly: {
@@ -91,7 +90,6 @@ export const ENEMY_TYPES = {
     anims: { idle: 'pigeon-idle', walk: 'pigeon-walk', fly: 'pigeon-fly' },
     size: 68,
     motion: 'pswoop',
-    facing: 'left',
     elevation: 165,
     box: { w: 96, h: 72, ox: 38, oy: 62 }
   },
