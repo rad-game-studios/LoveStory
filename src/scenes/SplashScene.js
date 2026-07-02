@@ -1,5 +1,6 @@
 import titleImage from '../../art/title_screen_Love_Story_ring_fix.png';
 import themeMusic from '../../sound/music/LoveStory-theme.mp3';
+import { addFullscreenButton } from '../ui/fullscreen.js';
 
 // Opening splash: shows the title art, then waits for input (locked for 3s).
 // Advances to the difficulty picker, which then routes on to character select
@@ -24,6 +25,7 @@ export class SplashScene extends Phaser.Scene {
 
     this.add.image(480, 270, 'title-splash').setDisplaySize(960, 540);
     this.cameras.main.fadeIn(500);
+    addFullscreenButton(this);
 
     this.startPrompt = this.add
       .text(480, 510, 'PRESS ENTER TO START', { fontSize: '22px', color: '#fde047', fontStyle: 'bold' })

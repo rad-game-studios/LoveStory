@@ -1,4 +1,5 @@
 import { hasBeatenGame } from '../services/progress.js';
+import { addFullscreenButton } from '../ui/fullscreen.js';
 
 const W = 960;
 const H = 540;
@@ -31,6 +32,7 @@ export class DifficultyScene extends Phaser.Scene {
     this.advanced = false;
 
     this.add.rectangle(W / 2, H / 2, W, H, 0x111827).setOrigin(0.5);
+    addFullscreenButton(this);
     this.add.text(W / 2, 92, 'CHOOSE DIFFICULTY', { fontSize: '44px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
 
     const top = 210;

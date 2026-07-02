@@ -1,4 +1,5 @@
 import { hasBeatenGame } from '../services/progress.js';
+import { addFullscreenButton } from '../ui/fullscreen.js';
 
 const W = 960;
 const H = 540;
@@ -20,6 +21,7 @@ export class HowToScene extends Phaser.Scene {
     }
 
     this.add.rectangle(W / 2, H / 2, W, H, 0x111827).setOrigin(0.5);
+    addFullscreenButton(this);
     this.add.text(W / 2, 32, 'HOW TO PLAY', { fontSize: '38px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
 
     // --- Controls (left column) ---

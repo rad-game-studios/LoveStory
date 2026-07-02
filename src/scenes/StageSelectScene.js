@@ -1,4 +1,5 @@
 import { SEGMENTS } from '../config/worldConfig.js';
+import { addFullscreenButton } from '../ui/fullscreen.js';
 
 const W = 960;
 const H = 540;
@@ -26,6 +27,7 @@ export class StageSelectScene extends Phaser.Scene {
     }
 
     this.add.rectangle(W / 2, H / 2, W, H, 0x111827).setOrigin(0.5);
+    addFullscreenButton(this);
     this.add.text(W / 2, 46, 'SELECT A STAGE', { fontSize: '38px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
     this.add
       .text(W / 2, 92, 'You beat the game — jump into any stage', { fontSize: '16px', color: '#9ca3af' })

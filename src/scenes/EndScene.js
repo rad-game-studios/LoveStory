@@ -1,6 +1,7 @@
 import { submitScore, getTopScores, leaderboardIsShared } from '../services/leaderboard.js';
 import { markGameBeaten } from '../services/progress.js';
 import { isTouchDevice } from '../ui/touchControls.js';
+import { addFullscreenButton } from '../ui/fullscreen.js';
 
 const W = 960;
 const H = 540;
@@ -27,6 +28,7 @@ export class EndScene extends Phaser.Scene {
     this.input.keyboard.clearCaptures();
 
     this.add.rectangle(W / 2, H / 2, W, H, 0x111827).setOrigin(0.5);
+    addFullscreenButton(this);
     this.add.text(W / 2, 30, 'YOU MADE IT!', { fontSize: '36px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
 
     // Leaderboard + name entry come FIRST so players actually submit; the
