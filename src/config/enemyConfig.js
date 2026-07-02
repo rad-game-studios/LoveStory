@@ -8,6 +8,7 @@ import gooseFlap from '../../art/enemies/Goose/Flap.png';
 import beerImg from '../../art/enemies/Beer/beer.png';
 import alienImg from '../../art/enemies/Alien/alien.png';
 import mooseImg from '../../art/enemies/moose/moose.png';
+import pigeonImg from '../../art/enemies/pigeon/pigeon.png';
 
 export const ENEMY_FRAME = 64;
 
@@ -36,6 +37,16 @@ const MOOSE_ANIMS = {
   'moose-charge': { frames: [12, 13, 14, 15], frameRate: 14 }
 };
 
+// Pigeon: a 4x4 grid sheet (168x176 frames, facing left) — idle (row 0), walk
+// (row 1), fly (row 2, wings out). Used by both the ground and swooping variants.
+const PIGEON_TEXTURE = 'pigeon-sheet';
+const PIGEON_SHEET = { url: pigeonImg, frameWidth: 168, frameHeight: 176 };
+const PIGEON_ANIMS = {
+  'pigeon-idle': { frames: [0, 1, 2, 3], frameRate: 4 },
+  'pigeon-walk': { frames: [4, 5, 6, 7], frameRate: 9 },
+  'pigeon-fly': { frames: [8, 9, 10, 11], frameRate: 12 }
+};
+
 // Hitbox inset within the 64x64 goose frame (transparent padding).
 export const GOOSE_BOX = { w: 38, h: 38, ox: 13, oy: 18 };
 
@@ -60,6 +71,30 @@ export const ENEMY_TYPES = {
     motion: 'charge',
     box: { w: 138, h: 108, ox: 34, oy: 50 }
   },
+  // Pigeon (Skate Park). Two variants share one sheet: a grounded one that walks
+  // back and forth, hops, and breaks into a run; and a swooping one that starts
+  // airborne and dive-bombs the player. Left-facing sheet.
+  pigeon: {
+    art: 'sheet',
+    texture: PIGEON_TEXTURE,
+    anim: 'pigeon-walk',
+    anims: { idle: 'pigeon-idle', walk: 'pigeon-walk', fly: 'pigeon-fly' },
+    size: 68,
+    motion: 'pwalk',
+    facing: 'left',
+    box: { w: 88, h: 92, ox: 42, oy: 58 }
+  },
+  pigeonFly: {
+    art: 'sheet',
+    texture: PIGEON_TEXTURE,
+    anim: 'pigeon-fly',
+    anims: { idle: 'pigeon-idle', walk: 'pigeon-walk', fly: 'pigeon-fly' },
+    size: 68,
+    motion: 'pswoop',
+    facing: 'left',
+    elevation: 165,
+    box: { w: 96, h: 72, ox: 38, oy: 62 }
+  },
   // Party dancers: ground placeholders (swap for sprite sheets later).
   danceGuy: { art: 'emoji', emoji: '🕺', size: 78, motion: 'dance', box: { w: 40, h: 58, ox: 19, oy: 12 } },
   danceGirl: { art: 'emoji', emoji: '💃', size: 78, motion: 'dance', box: { w: 40, h: 58, ox: 19, oy: 12 } }
@@ -82,6 +117,12 @@ export function preloadEnemies(scene) {
     scene.load.spritesheet(MOOSE_TEXTURE, MOOSE_SHEET.url, {
       frameWidth: MOOSE_SHEET.frameWidth,
       frameHeight: MOOSE_SHEET.frameHeight
+    });
+  }
+  if (!scene.textures.exists(PIGEON_TEXTURE)) {
+    scene.load.spritesheet(PIGEON_TEXTURE, PIGEON_SHEET.url, {
+      frameWidth: PIGEON_SHEET.frameWidth,
+      frameHeight: PIGEON_SHEET.frameHeight
     });
   }
 }
@@ -119,6 +160,18 @@ export function registerEnemyAnims(scene) {
     scene.anims.create({
       key,
       frames: scene.anims.generateFrameNumbers(MOOSE_TEXTURE, { frames: a.frames }),
+      frameRate: a.frameRate,
+      repeat: -1
+    });
+  });
+
+  Object.entries(PIGEON_ANIMS).forEach(([key, a]) => {
+    if (scene.anims.exists(key)) {
+      return;
+    }
+    scene.anims.create({
+      key,
+      frames: scene.anims.generateFrameNumbers(PIGEON_TEXTURE, { frames: a.frames }),
       frameRate: a.frameRate,
       repeat: -1
     });

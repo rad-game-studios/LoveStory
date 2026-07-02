@@ -16,9 +16,16 @@ const ALIEN_VSPEED = 95; // vertical zig speed (up/down legs form the V/X)
 const ALIEN_VLEG = 900; // ms per vertical leg before flipping direction
 const DANCE_SWAY = 60; // side-to-side sway speed
 const DANCE_HOP = 170; // occasional little hop
+const PIGEON_WALK = 40; // ground pigeon amble
+const PIGEON_RUN = 100; // occasional run burst
+const PIGEON_PATROL = 130; // patrol half-range
+const PIGEON_HOP = 210; // random little hop
+const PIGEON_SWOOP_H = 130; // swooper max horizontal pursuit speed
+const PIGEON_SWOOP_V = 120; // swooper max vertical dive/climb speed
+const PIGEON_SWOOP_RANGE = 240; // horizontal range within which it dives at the player
 
 // Motions that fly (no gravity, no floor collision).
-const FLYING_MOTIONS = new Set(['fly', 'vfly']);
+const FLYING_MOTIONS = new Set(['fly', 'vfly', 'pswoop']);
 
 // Enemy kinds are defined in enemyConfig's ENEMY_TYPES registry (art + motion).
 // All are lethal on side/below contact but squashed when stomped. Motions:
@@ -53,12 +60,22 @@ export class Enemy extends Phaser.GameObjects.Sprite {
     this.anim = usesAnim ? cfg.anim : null; // starting animation
     // Sheets facing left (moose) flip the opposite way to the right-facing default.
     this.facesLeft = cfg.facing === 'left';
-    // Charge motion swaps between a plod and a stampede animation.
+    // Named animations (used by charge/pigeon motions that swap between them).
     this.walkAnim = cfg.anims?.walk || this.anim;
     this.chargeAnim = cfg.anims?.charge || this.anim;
+    this.flyAnim = cfg.anims?.fly || this.anim;
+    this.idleAnim = cfg.anims?.idle || this.anim;
+    this.pigeonRunUntil = 0;
     this.initialX = x;
     this.initialY = spawnY;
-    const patrol = motion === 'patrolPause' ? BEER_PATROL : motion === 'vfly' ? ALIEN_PATROL : FLY_PATROL;
+    const patrol =
+      motion === 'patrolPause'
+        ? BEER_PATROL
+        : motion === 'vfly'
+        ? ALIEN_PATROL
+        : motion === 'pwalk'
+        ? PIGEON_PATROL
+        : FLY_PATROL;
     this.minX = x - patrol;
     this.maxX = x + patrol;
     this.dir = -1; // start toward the incoming player
@@ -182,6 +199,46 @@ export class Enemy extends Phaser.GameObjects.Sprite {
       if (wantAnim) {
         this.play(wantAnim, true); // ignoreIfPlaying — won't restart each frame
       }
+    } else if (this.motion === 'pwalk') {
+      // Ground pigeon: amble back and forth, break into an occasional run, and
+      // hop at random. Turns at the patrol edges or a wall.
+      if (this.x <= this.minX || this.body.blocked.left) {
+        this.dir = 1;
+      } else if (this.x >= this.maxX || this.body.blocked.right) {
+        this.dir = -1;
+      }
+      if (this.scene.time.now >= this.pigeonRunUntil && Math.random() < 0.004) {
+        this.pigeonRunUntil = this.scene.time.now + Phaser.Math.Between(500, 1100);
+      }
+      const running = this.scene.time.now < this.pigeonRunUntil;
+      this.body.setVelocityX((running ? PIGEON_RUN : PIGEON_WALK) * this.dir);
+      if (this.body.blocked.down && Math.random() < 0.012) {
+        this.body.setVelocityY(-PIGEON_HOP);
+      }
+      this.setFlipX(this.facesLeft ? this.dir > 0 : this.dir < 0);
+      // Flap while airborne (hopping), otherwise strut.
+      const want = this.body.blocked.down ? this.walkAnim : this.flyAnim;
+      if (want) {
+        this.play(want, true);
+      }
+    } else if (this.motion === 'pswoop') {
+      // Swooping pigeon: pursue the player horizontally, diving toward them when
+      // roughly overhead and climbing back to cruise height once they slip past.
+      const player = this.scene.playerMain;
+      if (player) {
+        const dx = player.x - this.x;
+        this.dir = dx < 0 ? -1 : 1;
+        this.body.setVelocityX(Phaser.Math.Clamp(dx * 2, -PIGEON_SWOOP_H, PIGEON_SWOOP_H));
+        const overhead = Math.abs(dx) < PIGEON_SWOOP_RANGE;
+        const targetY = overhead ? player.y - 8 : this.initialY;
+        this.body.setVelocityY(Phaser.Math.Clamp((targetY - this.y) * 3, -PIGEON_SWOOP_V, PIGEON_SWOOP_V));
+      } else {
+        this.body.setVelocity(0, 0);
+      }
+      this.setFlipX(this.facesLeft ? this.dir > 0 : this.dir < 0);
+      if (this.flyAnim) {
+        this.play(this.flyAnim, true);
+      }
     } else {
       if (this.body.blocked.left) {
         this.dir = 1;
@@ -216,6 +273,7 @@ export class Enemy extends Phaser.GameObjects.Sprite {
     this.dir = -1;
     this.paused = false;
     this.charging = false;
+    this.pigeonRunUntil = 0;
     if (this.motion === 'vfly') {
       this.nextFireAt = this.scene.time.now + Phaser.Math.Between(800, 2500);
     }

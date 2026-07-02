@@ -94,9 +94,9 @@ export const SEGMENTS = [
     ],
     // enemy `type`: 'walker' (default) | 'flyer'; flyer `y` = height above ground.
     enemies: [
-      { x: 400, type: 'walker' },
-      { x: 700, type: 'flyer', y: 140 },
-      { x: 950, type: 'walker' }
+      { x: 400, type: 'pigeon' },
+      { x: 700, type: 'pigeonFly', y: 150 },
+      { x: 950, type: 'pigeon' }
     ]
   },
   {
