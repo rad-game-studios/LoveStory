@@ -1,0 +1,56 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  /* Stop the browser hijacking touches (scroll/zoom/double-tap) so the game and
+     its on-screen buttons receive every tap. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  /* Use the dynamic viewport height on mobile so the canvas (and its bottom-edge
+     buttons) isn't hidden behind the browser toolbar / home bar. */
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+canvas {
+  display: block;
+  touch-action: none;
+}
+
+/* Nudge phones held upright to rotate — the game is 16:9 landscape. Shown only on
+   portrait touch screens; disappears the moment the device is turned. */
+#rotate-hint {
+  display: none;
+}
+@media (orientation: portrait) and (pointer: coarse) {
+  #rotate-hint {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    background: #111827;
+    color: #fef3c7;
+    font-family: system-ui, sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    line-height: 1.6;
+  }
+}
