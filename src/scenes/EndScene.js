@@ -27,127 +27,84 @@ export class EndScene extends Phaser.Scene {
     this.input.keyboard.clearCaptures();
 
     this.add.rectangle(W / 2, H / 2, W, H, 0x111827).setOrigin(0.5);
-    this.add.text(W / 2, 34, 'YOU MADE IT!', { fontSize: '40px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
+    this.add.text(W / 2, 30, 'YOU MADE IT!', { fontSize: '36px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
 
-    this.showScorecard();
+    // Leaderboard + name entry come FIRST so players actually submit; the
+    // collectables scorecard follows once they've entered their name.
+    this.showLeaderboardEntry();
   }
 
-  // Stage-by-stage collectable scorecard, shown before the name entry.
-  showScorecard() {
-    const collectables = this.results.collectables || [];
-    const objs = [];
-
-    objs.push(
-      this.add.text(W / 2, 92, 'SCORECARD', { fontSize: '26px', color: '#fde047', fontStyle: 'bold' }).setOrigin(0.5)
-    );
-    objs.push(
-      this.add
-        .text(W / 2, 122, 'Collectables gathered on each leg of the journey', {
-          fontSize: '15px',
-          color: '#9ca3af'
-        })
-        .setOrigin(0.5)
-    );
-
-    let y = 158;
-    if (!collectables.length) {
-      objs.push(
-        this.add.text(W / 2, y, 'No collectables tracked.', { fontSize: '17px', color: '#e5e7eb' }).setOrigin(0.5)
-      );
-      y += 30;
-    } else {
-      collectables.forEach((stage) => {
-        objs.push(
-          this.add
-            .text(W / 2 - 300, y, stage.stage, { fontSize: '17px', color: '#e5e7eb', fontStyle: 'bold' })
-            .setOrigin(0, 0.5)
-        );
-        const items = stage.items
-          .slice()
-          .sort((a, b) => (a.emoji === '🟡' ? -1 : b.emoji === '🟡' ? 1 : 0));
-        const summary = items.map((it) => `${it.emoji} ${it.collected}/${it.total}`).join('    ');
-        objs.push(
-          this.add
-            .text(W / 2 + 300, y, summary, { fontSize: '18px', color: '#ffffff', align: 'right' })
-            .setOrigin(1, 0.5)
-        );
-        y += 34;
-      });
-    }
-
-    objs.push(
-      this.add
-        .text(W / 2, H - 44, 'Press ENTER to continue', { fontSize: '16px', color: '#9ca3af' })
-        .setOrigin(0.5)
-    );
-
-    const proceed = () => {
-      this.input.keyboard.off('keydown-ENTER', proceed);
-      this.input.keyboard.off('keydown-SPACE', proceed);
-      this.input.off('pointerdown', proceed);
-      objs.forEach((o) => o.destroy());
-      this.showResults();
-    };
-    this.input.keyboard.on('keydown-ENTER', proceed);
-    this.input.keyboard.on('keydown-SPACE', proceed);
-    this.input.on('pointerdown', proceed);
-  }
-
-  showResults() {
+  showLeaderboardEntry() {
     const data = this.results;
     const coins = data.coins || 0;
     const enemies = data.enemiesDefeated || 0;
     const mult = data.multiplier || 1;
     const timeLeft = data.timeRemaining || 0;
     const finalScore = data.finalScore || 0;
+    this.entryObjs = [];
 
-    const breakdown = [
-      `Coins   ${coins} × 10   =   ${coins * 10}`,
-      `Enemies   ${enemies} × 50   =   ${enemies * 50}`,
-      `Time left ${fmtTime(timeLeft)}   →   × ${mult.toFixed(2)}`
-    ].join('\n');
-    this.add
-      .text(W / 2, 78, breakdown, { fontSize: '19px', color: '#e5e7eb', align: 'center', lineSpacing: 6 })
-      .setOrigin(0.5, 0);
+    const breakdown =
+      `Coins ${coins}×10=${coins * 10}     Enemies ${enemies}×50=${enemies * 50}     ` +
+      `Time ${fmtTime(timeLeft)} → ×${mult.toFixed(2)}`;
+    this.entryObjs.push(
+      this.add.text(W / 2, 64, breakdown, { fontSize: '15px', color: '#e5e7eb', align: 'center' }).setOrigin(0.5)
+    );
+    this.entryObjs.push(
+      this.add.text(W / 2, 100, `SCORE  ${finalScore}`, { fontSize: '32px', color: '#fde047', fontStyle: 'bold' }).setOrigin(0.5)
+    );
 
-    this.add.text(W / 2, 172, `SCORE  ${finalScore}`, { fontSize: '34px', color: '#fde047', fontStyle: 'bold' }).setOrigin(0.5);
-
-    // --- Name entry (canvas-native, no DOM element) ---
-    this.promptText = this.add
-      .text(W / 2, 216, 'Type your name for the leaderboard:', { fontSize: '17px', color: '#9ca3af' })
-      .setOrigin(0.5);
+    // --- Name entry (prominent, with cues so players know to leave their name) ---
     this.enteredName = '';
-    this.hint = this.add.text(W / 2, 286, '', { fontSize: '15px', color: '#9ca3af' }).setOrigin(0.5);
+    this.promptText = this.add
+      .text(W / 2, 140, 'Enter your name to join the LIVE Leaderboard!', { fontSize: '18px', color: '#fde047', fontStyle: 'bold' })
+      .setOrigin(0.5);
+    this.entryObjs.push(this.promptText);
+
+    // Pulsing highlighted box behind the field to signal "type/tap here".
+    const boxY = 180;
+    this.nameBox = this.add.rectangle(W / 2, boxY, 320, 54, 0x1f2937).setStrokeStyle(3, 0xfde047).setOrigin(0.5);
+    this.entryObjs.push(this.nameBox);
+    this.namePulse = this.tweens.add({
+      targets: this.nameBox,
+      alpha: { from: 1, to: 0.4 },
+      duration: 650,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.inOut'
+    });
 
     if (isTouchDevice()) {
-      this.buildTouchNameEntry();
+      this.buildTouchNameEntry(boxY);
     } else {
-      this.buildKeyboardNameEntry();
+      this.buildKeyboardNameEntry(boxY);
     }
 
-    // --- Leaderboard ---
-    this.add
-      .text(W / 2, 320, leaderboardIsShared() ? 'LEADERBOARD' : 'LEADERBOARD (this device)', {
-        fontSize: '18px',
-        color: '#fef3c7',
-        fontStyle: 'bold'
-      })
-      .setOrigin(0.5);
+    // --- LIVE Leaderboard ---
+    this.entryObjs.push(
+      this.add
+        .text(W / 2, 286, leaderboardIsShared() ? 'LIVE LEADERBOARD' : 'LIVE LEADERBOARD (this device)', {
+          fontSize: '18px',
+          color: '#fef3c7',
+          fontStyle: 'bold'
+        })
+        .setOrigin(0.5)
+    );
     this.boardText = this.add
-      .text(W / 2, 344, 'Loading…', { fontSize: '15px', color: '#e5e7eb', align: 'left', lineSpacing: 3, fontFamily: 'monospace' })
+      .text(W / 2, 310, 'Loading…', { fontSize: '15px', color: '#e5e7eb', align: 'left', lineSpacing: 3, fontFamily: 'monospace' })
       .setOrigin(0.5, 0);
+    this.entryObjs.push(this.boardText);
 
     this.refreshBoard();
   }
 
   // Desktop: capture keystrokes through Phaser and draw the name on the canvas
-  // (no DOM element to steal focus).
-  buildKeyboardNameEntry() {
-    this.add.rectangle(W / 2, 250, 240, 40, 0x1f2937).setStrokeStyle(2, 0xfde047).setOrigin(0.5);
+  // (no DOM element to steal focus). The blinking cursor signals it's typeable.
+  buildKeyboardNameEntry(boxY) {
     this.cursorOn = true;
     this.nameText = this.add
-      .text(W / 2, 250, '', { fontSize: '22px', color: '#ffffff', fontStyle: 'bold' })
+      .text(W / 2, boxY, '', { fontSize: '24px', color: '#ffffff', fontStyle: 'bold' })
       .setOrigin(0.5);
+    this.entryObjs.push(this.nameText);
     this.renderName();
     this.cursorTimer = this.time.addEvent({
       delay: 450,
@@ -158,8 +115,8 @@ export class EndScene extends Phaser.Scene {
       }
     });
 
-    // The very Enter press that advanced from the scorecard also fires a generic
-    // keydown here; arm submit a beat later so it can't self-submit an empty name.
+    // The very Enter press that advanced here also fires a generic keydown; arm
+    // submit a beat later so it can't self-submit an empty name.
     this.submitArmed = false;
     this.time.delayedCall(200, () => {
       this.submitArmed = true;
@@ -181,49 +138,100 @@ export class EndScene extends Phaser.Scene {
       }
     };
     this.input.keyboard.on('keydown', this.onNameKey);
-    this.hint.setText('Press ENTER to submit');
+    this.hint = this.add.text(W / 2, boxY + 34, 'Type your name, then press ENTER', { fontSize: '14px', color: '#9ca3af' }).setOrigin(0.5);
+    this.entryObjs.push(this.hint);
   }
 
-  // Touch devices have no hardware keyboard, so use a real DOM <input> (which
-  // pops the on-screen keyboard) plus a tappable SUBMIT button. Safe here: the End
-  // screen is terminal (you refresh to play again), so no later scene is affected.
-  buildTouchNameEntry() {
-    const el = this.add.dom(
-      W / 2,
-      250,
-      'input',
-      'width:220px;height:36px;font-size:20px;text-align:center;text-transform:uppercase;' +
-        'border-radius:6px;border:2px solid #fde047;background:#1f2937;color:#ffffff;outline:none;'
-    );
-    el.node.setAttribute('maxlength', '12');
-    el.node.setAttribute('placeholder', 'NAME');
-    el.node.setAttribute('autocapitalize', 'characters');
-    el.node.setAttribute('autocomplete', 'off');
-    el.node.setAttribute('enterkeyhint', 'go');
-    el.node.addEventListener('input', () => {
-      this.enteredName = el.node.value;
+  // Touch devices have no hardware keyboard, so overlay a real <input> (which pops
+  // the on-screen keyboard). Phaser's own add.dom mispositions under Scale.FIT, so
+  // we place a plain fixed <input> ourselves and keep it aligned to the on-canvas
+  // yellow box (re-aligning on resize/rotate). The SUBMIT button stays a canvas
+  // object — Phaser maps its taps correctly.
+  buildTouchNameEntry(boxY) {
+    const canvas = this.game.canvas;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.maxLength = 12;
+    input.placeholder = 'TAP TO TYPE NAME';
+    input.setAttribute('autocapitalize', 'characters');
+    input.setAttribute('autocomplete', 'off');
+    input.setAttribute('enterkeyhint', 'go');
+    Object.assign(input.style, {
+      position: 'fixed',
+      boxSizing: 'border-box',
+      textAlign: 'center',
+      textTransform: 'uppercase',
+      fontWeight: 'bold',
+      letterSpacing: '2px',
+      color: '#ffffff',
+      background: '#0b1220',
+      border: '3px solid #fde047',
+      borderRadius: '8px',
+      outline: 'none',
+      zIndex: '10',
+      transform: 'translate(-50%, -50%)'
     });
-    el.node.addEventListener('keydown', (e) => {
+    document.body.appendChild(input);
+    this.nameInputEl = input;
+
+    // Keep the <input> exactly over the canvas box regardless of scale/orientation.
+    const reposition = () => {
+      const r = canvas.getBoundingClientRect();
+      const sx = r.width / W;
+      const sy = r.height / H;
+      input.style.left = `${r.left + (W / 2) * sx}px`;
+      input.style.top = `${r.top + boxY * sy}px`;
+      input.style.width = `${300 * sx}px`;
+      input.style.height = `${44 * sy}px`;
+      input.style.fontSize = `${22 * sy}px`;
+    };
+    reposition();
+    this._repositionInput = reposition;
+    this.scale.on('resize', reposition);
+    window.addEventListener('resize', reposition);
+    window.addEventListener('orientationchange', reposition);
+    this.events.once('shutdown', () => this.removeNameInput());
+
+    input.addEventListener('input', () => {
+      this.enteredName = input.value;
+    });
+    input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         this.submit();
       }
     });
-    this.nameDom = el;
-    this.time.delayedCall(60, () => el.node.focus());
+    setTimeout(() => input.focus(), 60);
 
     this.submitButton = this.add
-      .text(712, 250, 'SUBMIT', {
-        fontSize: '18px',
+      .text(W / 2, boxY + 52, '✓  SUBMIT', {
+        fontSize: '20px',
         color: '#111827',
         backgroundColor: '#fde047',
         fontStyle: 'bold',
-        padding: { x: 22, y: 9 }
+        padding: { x: 34, y: 10 }
       })
       .setOrigin(0.5)
       .setInteractive({ useHandCursor: true });
     this.submitButton.on('pointerdown', () => this.submit());
-    this.hint.setText('Tap SUBMIT when done');
+    this.entryObjs.push(this.submitButton);
+    this.hint = this.add
+      .text(W / 2, boxY + 92, 'Tap the box, type your name, then SUBMIT', { fontSize: '13px', color: '#9ca3af' })
+      .setOrigin(0.5);
+    this.entryObjs.push(this.hint);
+  }
+
+  removeNameInput() {
+    if (this._repositionInput) {
+      this.scale.off('resize', this._repositionInput);
+      window.removeEventListener('resize', this._repositionInput);
+      window.removeEventListener('orientationchange', this._repositionInput);
+      this._repositionInput = null;
+    }
+    if (this.nameInputEl) {
+      this.nameInputEl.remove();
+      this.nameInputEl = null;
+    }
   }
 
   renderName() {
@@ -254,7 +262,11 @@ export class EndScene extends Phaser.Scene {
     this.submitted = true;
     const name = (this.enteredName || 'ANON').trim().toUpperCase().slice(0, 12) || 'ANON';
 
-    // Tear down whichever entry path was used.
+    // Tear down whichever entry path was used and stop the "type here" pulse.
+    if (this.namePulse) {
+      this.namePulse.stop();
+      this.nameBox.setAlpha(1);
+    }
     if (this.onNameKey) {
       this.input.keyboard.off('keydown', this.onNameKey);
     }
@@ -265,26 +277,71 @@ export class EndScene extends Phaser.Scene {
     if (this.nameText) {
       this.nameText.setText(name);
     }
-    if (this.nameDom) {
-      this.nameDom.node.blur();
-      this.nameDom.destroy();
-    }
+    this.removeNameInput();
     if (this.submitButton) {
       this.submitButton.disableInteractive().setAlpha(0.5);
     }
     this.hint.setText('Saving…');
 
     await submitScore(name, this.results.finalScore || 0);
-    this.promptText.setText(`Nice run, ${name}!`);
+    this.promptText.setText(`Nice run, ${name}! You're on the LIVE Leaderboard.`).setColor('#86efac');
     this.hint.setText('');
 
     await this.refreshBoard(name);
 
-    // No in-game replay button: starting a fresh run re-triggered a stubborn
-    // input-freeze bug on the next level, so we ask the player to refresh
-    // (a clean page load) to play again.
+    // Now offer the collectables scorecard (the leaderboard has already been shown
+    // and submitted to — this is the secondary screen).
+    const goLabel = isTouchDevice() ? 'Tap anywhere for your scorecard  →' : 'Press ENTER for your scorecard  →';
+    this.continuePrompt = this.add
+      .text(W / 2, H - 24, goLabel, { fontSize: '16px', color: '#fde047', fontStyle: 'bold' })
+      .setOrigin(0.5);
+    this.tweens.add({ targets: this.continuePrompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
+
+    const go = () => {
+      this.input.keyboard.off('keydown-ENTER', go);
+      this.input.keyboard.off('keydown-SPACE', go);
+      this.input.off('pointerdown', go);
+      this.showScorecard();
+    };
+    this.input.keyboard.on('keydown-ENTER', go);
+    this.input.keyboard.on('keydown-SPACE', go);
+    this.input.on('pointerdown', go);
+  }
+
+  // Terminal screen: stage-by-stage collectables + how to play again.
+  showScorecard() {
+    if (this.namePulse) {
+      this.namePulse.stop();
+    }
+    (this.entryObjs || []).forEach((o) => o.destroy());
+    if (this.continuePrompt) {
+      this.continuePrompt.destroy();
+    }
+
+    const collectables = this.results.collectables || [];
+
+    this.add.text(W / 2, 92, 'SCORECARD', { fontSize: '26px', color: '#fde047', fontStyle: 'bold' }).setOrigin(0.5);
     this.add
-      .text(W / 2, H - 30, 'Refresh your browser to play again.\nCan you make it to the top of the leaderboard?', {
+      .text(W / 2, 122, 'Collectables gathered on each leg of the journey', { fontSize: '15px', color: '#9ca3af' })
+      .setOrigin(0.5);
+
+    let y = 158;
+    if (!collectables.length) {
+      this.add.text(W / 2, y, 'No collectables tracked.', { fontSize: '17px', color: '#e5e7eb' }).setOrigin(0.5);
+    } else {
+      collectables.forEach((stage) => {
+        this.add
+          .text(W / 2 - 300, y, stage.stage, { fontSize: '17px', color: '#e5e7eb', fontStyle: 'bold' })
+          .setOrigin(0, 0.5);
+        const items = stage.items.slice().sort((a, b) => (a.emoji === '🟡' ? -1 : b.emoji === '🟡' ? 1 : 0));
+        const summary = items.map((it) => `${it.emoji} ${it.collected}/${it.total}`).join('    ');
+        this.add.text(W / 2 + 300, y, summary, { fontSize: '18px', color: '#ffffff', align: 'right' }).setOrigin(1, 0.5);
+        y += 34;
+      });
+    }
+
+    this.add
+      .text(W / 2, H - 34, 'Refresh your browser to play again.\nCan you make it to the top of the LIVE Leaderboard?', {
         fontSize: '18px',
         color: '#fde047',
         fontStyle: 'bold',
