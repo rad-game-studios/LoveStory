@@ -375,6 +375,18 @@ export class RunScene extends Phaser.Scene {
         if (hb.special && !this.firstSpecialBox && i >= this.startSegment) {
           this.firstSpecialBox = block;
         }
+        // Coin boxes that hold a themed, scored collectable (e.g. the zero level's
+        // 🌀) get tracked so they show up on the scorecard.
+        if (hb.coin) {
+          block.coin = hb.coin;
+          block.segmentIndex = i;
+          block.statKey = hb.coin.emoji || '🟡';
+          const stats = this.collectableStats[i];
+          if (!stats[block.statKey]) {
+            stats[block.statKey] = { emoji: block.statKey, collected: 0, total: 0 };
+          }
+          stats[block.statKey].total += 1;
+        }
       });
       (seg.enemies || []).forEach((e) => {
         this.enemies.push(new Enemy(this, base + this.spread(e.x, i), this.groundTop, { type: e.type, elevation: e.y, scale: e.scale }));
@@ -536,18 +548,30 @@ export class RunScene extends Phaser.Scene {
   }
 
   dispenseCoin(block) {
+    const cfg = block.coin;
+    const points = cfg ? cfg.points : COIN_POINTS;
     this.coinsCollected += 1;
-    this.baseScore += COIN_POINTS;
+    this.baseScore += points;
     this.refreshScore();
-    this.showPoints(COIN_POINTS);
-    const coin = this.add.image(block.x, block.y - 6, 'coin-tex').setDepth(7);
+    this.showPoints(points);
+
+    // Record themed coin-box collectables (e.g. 🌀) on the scorecard.
+    if (cfg && this.collectableStats[block.segmentIndex] && this.collectableStats[block.segmentIndex][block.statKey]) {
+      this.collectableStats[block.segmentIndex][block.statKey].collected += 1;
+    }
+
+    // Floating pickup — the emoji for themed coins, otherwise the coin sprite.
+    const pickup =
+      cfg && cfg.emoji
+        ? this.add.text(block.x, block.y - 6, cfg.emoji, { fontSize: '30px' }).setOrigin(0.5).setDepth(7)
+        : this.add.image(block.x, block.y - 6, 'coin-tex').setDepth(7);
     this.tweens.add({
-      targets: coin,
-      y: coin.y - 46,
+      targets: pickup,
+      y: pickup.y - 46,
       alpha: 0,
-      duration: 420,
+      duration: 500,
       ease: 'Quad.out',
-      onComplete: () => coin.destroy()
+      onComplete: () => pickup.destroy()
     });
     if (this.effects) {
       this.effects.sparkle(block.x, block.y - 10, 6);

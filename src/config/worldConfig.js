@@ -152,9 +152,14 @@ export const SEGMENTS = [
     obstacles: [{ x: 300, width: 50, height: 80 }, { x: 720, width: 55, height: 100 }],
     platforms: [{ x: 200, y: 130, width: 120 }, { x: 560, y: 150, width: 120 }],
     pits: [{ x: 470, width: 130 }],
-    // Zero stage: no enemies — 10x the coins, reskinned as bone emojis.
+    // Zero stage: no enemies — 10x the coins, reskinned as bone emojis. The two
+    // coin boxes hold a 🌀 time-warp collectable worth 111 (tracked on scorecard).
     coins: boneField(50),
-    hitBlocks: [{ x: 380, y: 120 }, { x: 850, y: 120 }],
+    hitBlocks: [
+      { x: 380, y: 120, coin: { emoji: '🌀', points: 111 } },
+      { x: 620, y: 120, coin: { emoji: '🌀', points: 111 } },
+      { x: 850, y: 120, coin: { emoji: '🌀', points: 111 } }
+    ],
     enemies: []
   },
   {
