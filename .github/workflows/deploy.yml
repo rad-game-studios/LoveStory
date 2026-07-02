@@ -11,10 +11,12 @@ permissions:
   pages: write
   id-token: write
 
-# One deploy at a time; let a newer push cancel an in-flight run.
+# One deploy at a time. Do NOT cancel an in-flight deployment — cancelling a
+# Pages deploy mid-publish can wedge the Pages queue (deployments stuck in
+# "queued" until they time out). Newer runs wait their turn instead.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   build:
