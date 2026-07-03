@@ -58,8 +58,9 @@ export const ENEMY_TYPES = {
   walker: { art: 'goose', anim: 'goose-walk', motion: 'walk', box: GOOSE_BOX },
   flyer: { art: 'goose', anim: 'goose-flap', motion: 'fly', box: GOOSE_BOX, elevation: 130 },
   beer: { art: 'sheet', anim: 'beer-anim', size: 64, motion: 'patrolPause' },
-  // Alien: sky enemy in a flying saucer that sweeps a V/zig-zag path.
-  alien: { art: 'sheet', anim: 'alien-fly', size: 180, motion: 'vfly', elevation: 210, box: { w: 96, h: 76, ox: 22, oy: 18 } },
+  // Alien: sky enemy in a flying saucer that sweeps a V/zig-zag path. Worth 3x
+  // the standard enemy points (trickier to reach and fires laser pulses).
+  alien: { art: 'sheet', anim: 'alien-fly', size: 180, motion: 'vfly', elevation: 210, points: 150, box: { w: 96, h: 76, ox: 22, oy: 18 } },
   // Moose: big land animal that plods along the ground, then charges the player
   // at double speed when they get close (Northern Lights). Right-facing sheet.
   moose: {

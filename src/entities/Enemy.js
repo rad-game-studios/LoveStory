@@ -55,6 +55,7 @@ export class Enemy extends Phaser.GameObjects.Sprite {
     scene.physics.add.existing(this, false);
 
     this.type = type;
+    this.points = cfg.points ?? null; // null = use RunScene's global ENEMY_POINTS
     this.motion = motion;
     this.isFlyer = isFlyer;
     this.anim = usesAnim ? cfg.anim : null; // starting animation

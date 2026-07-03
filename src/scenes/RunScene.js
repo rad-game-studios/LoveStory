@@ -532,9 +532,10 @@ export class RunScene extends Phaser.Scene {
     }
     enemy.squash();
     this.enemiesDefeated += 1;
-    this.baseScore += ENEMY_POINTS;
+    const pts = enemy.points ?? ENEMY_POINTS;
+    this.baseScore += pts;
     this.refreshScore();
-    this.showPoints(ENEMY_POINTS);
+    this.showPoints(pts);
     if (this.effects) {
       this.effects.sparkle(enemy.x, enemy.body.top, 10);
     }
@@ -548,9 +549,10 @@ export class RunScene extends Phaser.Scene {
     }
     enemy.squash();
     this.enemiesDefeated += 1;
-    this.baseScore += ENEMY_POINTS;
+    const pts = enemy.points ?? ENEMY_POINTS;
+    this.baseScore += pts;
     this.refreshScore();
-    this.showPoints(ENEMY_POINTS);
+    this.showPoints(pts);
     if (this.effects) {
       this.effects.sparkle(enemy.x, enemy.body.top, 10);
     }
@@ -1343,9 +1345,10 @@ export class RunScene extends Phaser.Scene {
       this.playerMain.bounce();
       this.effects.sparkle(enemy.x, enemy.body.top);
       this.enemiesDefeated += 1;
-      this.baseScore += ENEMY_POINTS;
+      const pts = enemy.points ?? ENEMY_POINTS;
+      this.baseScore += pts;
       this.refreshScore();
-      this.showPoints(ENEMY_POINTS);
+      this.showPoints(pts);
     } else {
       const result = this.playerMain.hurt();
       if (result === 'reset') {
@@ -1377,9 +1380,10 @@ export class RunScene extends Phaser.Scene {
       if (e.x + hw >= x0 && e.x - hw <= x1 && Math.abs(e.y - player.y) < 80) {
         e.squash();
         this.enemiesDefeated += 1;
-        this.baseScore += ENEMY_POINTS;
+        const pts = e.points ?? ENEMY_POINTS;
+        this.baseScore += pts;
         this.refreshScore();
-        this.showPoints(ENEMY_POINTS);
+        this.showPoints(pts);
         if (this.effects) {
           this.effects.sparkle(e.x, e.body.top);
         }
