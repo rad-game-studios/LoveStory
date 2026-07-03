@@ -2,6 +2,7 @@ import { submitScore, getTopScores, leaderboardIsShared } from '../services/lead
 import { markGameBeaten, saveLastScorecard } from '../services/progress.js';
 import { isTouchDevice } from '../ui/touchControls.js';
 import { addFullscreenButton } from '../ui/fullscreen.js';
+import { createScrollList } from '../ui/scrollList.js';
 
 const W = 960;
 const H = 540;
@@ -83,20 +84,26 @@ export class EndScene extends Phaser.Scene {
       this.buildKeyboardNameEntry(boxY);
     }
 
-    // --- LIVE Leaderboard ---
+    // --- LIVE Leaderboard (full + scrollable) ---
     this.entryObjs.push(
       this.add
-        .text(W / 2, 286, leaderboardIsShared() ? 'LIVE LEADERBOARD' : 'LIVE LEADERBOARD (this device)', {
+        .text(W / 2, 284, leaderboardIsShared() ? 'LIVE LEADERBOARD' : 'LIVE LEADERBOARD (this device)', {
           fontSize: '18px',
           color: '#fef3c7',
           fontStyle: 'bold'
         })
         .setOrigin(0.5)
     );
-    this.boardText = this.add
-      .text(W / 2, 310, 'Loading…', { fontSize: '15px', color: '#e5e7eb', align: 'left', lineSpacing: 3, fontFamily: 'monospace' })
-      .setOrigin(0.5, 0);
-    this.entryObjs.push(this.boardText);
+    this.boardList = createScrollList(this, {
+      x: 300,
+      y: 306,
+      width: 360,
+      height: 190,
+      depth: 5,
+      arrowKeys: true,
+      style: { fontSize: '16px', color: '#e5e7eb', fontFamily: 'monospace', lineSpacing: 5 }
+    });
+    this.boardList.setText('Loading…');
 
     this.refreshBoard();
   }
@@ -247,16 +254,26 @@ export class EndScene extends Phaser.Scene {
   }
 
   async refreshBoard(highlightName) {
-    const top = await getTopScores(8);
+    const top = await getTopScores(500);
+    if (!this.boardList) {
+      return;
+    }
     if (!top.length) {
-      this.boardText.setText('No scores yet — be the first!');
+      this.boardList.setText('No scores yet — be the first!');
       return;
     }
     const lines = top.map((e, i) => {
-      const row = `${String(i + 1).padStart(2, ' ')}. ${String(e.name).padEnd(12, ' ')} ${e.score}`;
+      const row = `${String(i + 1).padStart(3, ' ')}. ${String(e.name).padEnd(12, ' ')} ${e.score}`;
       return highlightName && e.name === highlightName ? `▶ ${row}` : `  ${row}`;
     });
-    this.boardText.setText(lines.join('\n'));
+    this.boardList.setText(lines.join('\n'));
+    // After submitting, scroll to the player's row so they can see their rank.
+    if (highlightName) {
+      const idx = top.findIndex((e) => e.name === highlightName);
+      if (idx >= 0) {
+        this.boardList.revealLine(idx, lines.length);
+      }
+    }
   }
 
   async submit() {
@@ -293,29 +310,40 @@ export class EndScene extends Phaser.Scene {
 
     await this.refreshBoard(name);
 
-    // Now offer the collectables scorecard (the leaderboard has already been shown
-    // and submitted to — this is the secondary screen).
-    const goLabel = isTouchDevice() ? 'Tap anywhere for your scorecard  →' : 'Press ENTER for your scorecard  →';
+    // Offer the collectables scorecard. A dedicated button (not a tap-anywhere)
+    // so scrolling/dragging the leaderboard doesn't skip ahead.
+    const goLabel = isTouchDevice() ? '🎫  Scorecard  →' : 'Scorecard  →   (ENTER)';
     this.continuePrompt = this.add
-      .text(W / 2, H - 24, goLabel, { fontSize: '16px', color: '#fde047', fontStyle: 'bold' })
-      .setOrigin(0.5);
-    this.tweens.add({ targets: this.continuePrompt, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
+      .text(W / 2, H - 22, goLabel, {
+        fontSize: '16px',
+        color: '#111827',
+        backgroundColor: '#fde047',
+        fontStyle: 'bold',
+        padding: { x: 16, y: 6 }
+      })
+      .setOrigin(0.5)
+      .setDepth(20)
+      .setInteractive({ useHandCursor: true });
 
     const go = () => {
       this.input.keyboard.off('keydown-ENTER', go);
       this.input.keyboard.off('keydown-SPACE', go);
-      this.input.off('pointerdown', go);
+      this.continuePrompt.off('pointerdown', go);
       this.showScorecard();
     };
+    this.continuePrompt.on('pointerdown', go);
     this.input.keyboard.on('keydown-ENTER', go);
     this.input.keyboard.on('keydown-SPACE', go);
-    this.input.on('pointerdown', go);
   }
 
   // Terminal screen: stage-by-stage collectables + how to play again.
   showScorecard() {
     if (this.namePulse) {
       this.namePulse.stop();
+    }
+    if (this.boardList) {
+      this.boardList.destroy();
+      this.boardList = null;
     }
     (this.entryObjs || []).forEach((o) => o.destroy());
     if (this.continuePrompt) {

@@ -2,6 +2,7 @@ import { SEGMENTS } from '../config/worldConfig.js';
 import { addFullscreenButton } from '../ui/fullscreen.js';
 import { getTopScores, leaderboardIsShared } from '../services/leaderboard.js';
 import { getLastScorecard } from '../services/progress.js';
+import { createScrollList } from '../ui/scrollList.js';
 
 const W = 960;
 const H = 540;
@@ -133,6 +134,10 @@ export class StageSelectScene extends Phaser.Scene {
     }
     (this.overlayObjs || []).forEach((o) => o.destroy());
     this.overlayObjs = [];
+    if (this.overlayList) {
+      this.overlayList.destroy();
+      this.overlayList = null;
+    }
     if (this._overlayClose) {
       this.input.keyboard.off('keydown-ESC', this._overlayClose);
       this._overlayClose = null;
@@ -144,7 +149,7 @@ export class StageSelectScene extends Phaser.Scene {
     this.openOverlay(async () => {
       this.overlayObjs.push(
         this.add
-          .text(W / 2, H / 2 - 176, leaderboardIsShared() ? 'LIVE LEADERBOARD' : 'LIVE LEADERBOARD (this device)', {
+          .text(W / 2, H / 2 - 190, leaderboardIsShared() ? 'LIVE LEADERBOARD' : 'LIVE LEADERBOARD (this device)', {
             fontSize: '24px',
             color: '#fef3c7',
             fontStyle: 'bold'
@@ -152,28 +157,29 @@ export class StageSelectScene extends Phaser.Scene {
           .setOrigin(0.5)
           .setDepth(52)
       );
-      const body = this.add
-        .text(W / 2, H / 2 - 132, 'Loading…', {
-          fontSize: '18px',
-          color: '#e5e7eb',
-          align: 'left',
-          lineSpacing: 6,
-          fontFamily: 'monospace'
-        })
-        .setOrigin(0.5, 0)
-        .setDepth(52);
-      this.overlayObjs.push(body);
+      // Full, scrollable board (wheel / drag / arrow keys).
+      const list = createScrollList(this, {
+        x: 288,
+        y: H / 2 - 156,
+        width: 384,
+        height: 320,
+        depth: 52,
+        arrowKeys: true,
+        style: { fontSize: '18px', color: '#e5e7eb', fontFamily: 'monospace', lineSpacing: 8 }
+      });
+      this.overlayList = list;
+      list.setText('Loading…');
 
-      const top = await getTopScores(10);
-      if (!this.overlayOpen || !body.active) {
+      const top = await getTopScores(500);
+      if (!this.overlayOpen || this.overlayList !== list) {
         return;
       }
       if (!top.length) {
-        body.setText('No scores yet — be the first!');
+        list.setText('No scores yet — be the first!');
       } else {
-        body.setText(
+        list.setText(
           top
-            .map((e, i) => `${String(i + 1).padStart(2, ' ')}. ${String(e.name).padEnd(12, ' ')} ${e.score}`)
+            .map((e, i) => `${String(i + 1).padStart(3, ' ')}. ${String(e.name).padEnd(12, ' ')} ${e.score}`)
             .join('\n')
         );
       }
