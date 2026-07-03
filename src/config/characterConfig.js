@@ -12,6 +12,7 @@ import rickyPortrait from '../../art/sprites/ricky-portrait.png';
 import denisePortrait from '../../art/sprites/denise-portrait.png';
 import dogSheet from '../../art/sprites/dog.png';
 import dogPortrait from '../../art/sprites/dog-portrait.png';
+import dogActions from '../../art/sprites/dog-actions.png';
 
 export const FRAME_WIDTH = 128;
 export const FRAME_HEIGHT = 192;
@@ -80,6 +81,44 @@ export const DOG = {
     jump: { frames: [5], frameRate: 1, repeat: -1 }
   }
 };
+
+// Zero's extra action poses (dog-actions.png: lie / bark / downward-dog; the 4th
+// frame is the existing jump pose, so it's unused). Same 128x192 frame size.
+export const ZERO_ACTIONS_KEY = 'zero-actions';
+const ZERO_ACTIONS = {
+  sheet: dogActions,
+  frameWidth: FRAME_WIDTH,
+  frameHeight: FRAME_HEIGHT,
+  anims: {
+    lie: { frame: 0 },
+    bark: { frame: 1 },
+    downdog: { frame: 2 }
+  }
+};
+
+export function preloadZeroActions(scene) {
+  if (!scene.textures.exists(ZERO_ACTIONS_KEY)) {
+    scene.load.spritesheet(ZERO_ACTIONS_KEY, ZERO_ACTIONS.sheet, {
+      frameWidth: ZERO_ACTIONS.frameWidth,
+      frameHeight: ZERO_ACTIONS.frameHeight
+    });
+  }
+}
+
+export function registerZeroActionAnims(scene) {
+  Object.entries(ZERO_ACTIONS.anims).forEach(([name, def]) => {
+    const key = `zero-${name}`;
+    if (scene.anims.exists(key)) {
+      return;
+    }
+    scene.anims.create({
+      key,
+      frames: [{ key: ZERO_ACTIONS_KEY, frame: def.frame }],
+      frameRate: 1,
+      repeat: -1
+    });
+  });
+}
 
 // Register a set of animations (idempotent — anims are global).
 export function registerAnimsFor(scene, key, animsDef) {

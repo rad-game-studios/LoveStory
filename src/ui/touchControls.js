@@ -20,7 +20,8 @@ export function createVirtualInput() {
     down: false,
     jumpEdge: false, // set on jump press, cleared after PlayerMain reads it
     jumpReleasedEdge: false, // set on jump release
-    shootEdge: false // set on shoot press
+    shootEdge: false, // set on shoot press
+    barkEdge: false // set on bark press (Zero only)
   };
 }
 
@@ -111,6 +112,15 @@ export function setupTouchControls(scene) {
     const canShoot = Boolean(scene.playerMain && scene.playerMain.canShoot);
     fireObjs.forEach((o) => o.setVisible(canShoot));
   });
+
+  // Bark button — only when playing as Zero.
+  if (scene.mainCharacter === 'zero') {
+    makeButton(752, 352, 40, '🔊', () => (vinput.barkEdge = true), null, {
+      color: 0xfacc15,
+      idleAlpha: 0.3,
+      pressAlpha: 0.6
+    });
+  }
 
   return vinput;
 }

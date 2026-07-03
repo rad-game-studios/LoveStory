@@ -15,7 +15,15 @@ import {
   CROSSFADE_BAND,
   BACKDROP_ZOOM
 } from '../config/worldConfig.js';
-import { CHARACTERS, DOG, SHEET_KEY, registerCharacterAnims, registerAnimsFor } from '../config/characterConfig.js';
+import {
+  CHARACTERS,
+  DOG,
+  SHEET_KEY,
+  registerCharacterAnims,
+  registerAnimsFor,
+  preloadZeroActions,
+  registerZeroActionAnims
+} from '../config/characterConfig.js';
 import { preloadEnemies, registerEnemyAnims } from '../config/enemyConfig.js';
 import { Effects } from '../effects/Effects.js';
 import { setupTouchControls } from '../ui/touchControls.js';
@@ -89,6 +97,7 @@ export class RunScene extends Phaser.Scene {
     if (!this.textures.exists('dog-portrait')) {
       this.load.image('dog-portrait', DOG.portrait);
     }
+    preloadZeroActions(this);
     if (!this.textures.exists('engagement')) {
       this.load.image('engagement', engagementImg);
     }
@@ -129,6 +138,7 @@ export class RunScene extends Phaser.Scene {
 
     Object.keys(CHARACTERS).forEach((c) => registerCharacterAnims(this, c));
     registerAnimsFor(this, 'dog', DOG.anims);
+    registerZeroActionAnims(this);
     registerEnemyAnims(this);
 
     this.zeroIndex = SEGMENTS.findIndex((s) => s.key === 'timeJumpZero');
@@ -1343,6 +1353,62 @@ export class RunScene extends Phaser.Scene {
       } else if (result === 'hit') {
         this.showOuch();
       }
+    }
+  }
+
+  // Zero's bark: defeats enemies in a short band radiating from his front (about
+  // half a sprite-length), plus a little sound-wave flourish.
+  zeroBark(player) {
+    if (this.transitioning) {
+      return;
+    }
+    const dir = player.facingLeft ? -1 : 1;
+    const w = player.spriteWidth();
+    const frontEdge = player.x + dir * (w / 2);
+    const farEdge = frontEdge + dir * (w * 0.5);
+    const x0 = Math.min(frontEdge, farEdge);
+    const x1 = Math.max(frontEdge, farEdge);
+
+    (this.enemies || []).forEach((e) => {
+      if (!e.alive || !e.body) {
+        return;
+      }
+      const hw = e.body.halfWidth || 20;
+      if (e.x + hw >= x0 && e.x - hw <= x1 && Math.abs(e.y - player.y) < 80) {
+        e.squash();
+        this.enemiesDefeated += 1;
+        this.baseScore += ENEMY_POINTS;
+        this.refreshScore();
+        this.showPoints(ENEMY_POINTS);
+        if (this.effects) {
+          this.effects.sparkle(e.x, e.body.top);
+        }
+      }
+    });
+
+    // Sound-wave flourish + WOOF!
+    const wy = player.y - 22;
+    const woof = this.add
+      .text(farEdge + dir * 6, wy - 18, 'WOOF!', { fontSize: '16px', color: '#fde047', fontStyle: 'bold' })
+      .setOrigin(0.5)
+      .setDepth(12);
+    this.tweens.add({ targets: woof, y: woof.y - 18, alpha: 0, duration: 480, onComplete: () => woof.destroy() });
+    for (let i = 0; i < 3; i++) {
+      const arc = this.add
+        .ellipse(frontEdge, wy, 6, 24, 0x000000, 0)
+        .setStrokeStyle(3, 0xfde047, 0.9)
+        .setDepth(11)
+        .setAlpha(0.9);
+      this.tweens.add({
+        targets: arc,
+        scaleX: 3 + i,
+        scaleY: 1.5,
+        x: frontEdge + dir * (10 + i * 8),
+        alpha: 0,
+        duration: 320,
+        delay: i * 55,
+        onComplete: () => arc.destroy()
+      });
     }
   }
 

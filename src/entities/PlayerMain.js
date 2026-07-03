@@ -12,6 +12,14 @@ const SHOOT_COOLDOWN = 160;
 const HIT_INVULN = 1200;
 const BASE_HEARTS = 3; // life points the player always starts/respawns with
 
+// Zero-only: downward-dog charge jump + bark.
+const DOWNDOG_RED_MS = 1000; // hold down 1s -> red -> 1.5x jump
+const DOWNDOG_BLUE_MS = 2000; // hold down 2s -> blue -> 2x jump
+const DOWNDOG_RED_MULT = 1.5;
+const DOWNDOG_BLUE_MULT = 2;
+const BARK_COOLDOWN = 500;
+const BARK_ANIM_MS = 300;
+
 // Power-up effects. Only one is active at a time — collecting a special resets
 // to base and applies the new one (Mario-style). Unset fields default to base.
 //   speed/jump/size multipliers · board (skateboard visual) · shoot · hearts
@@ -35,10 +43,17 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.scene.add.existing(this);
 
     this.mainCharacter = mainCharacter;
+    this.isZero = mainCharacter === 'zero';
     // Zero's art faces right by default; the humans face left.
     this.facesRight = Boolean(CHARACTERS[mainCharacter] && CHARACTERS[mainCharacter].facesRight);
     this.controlsEnabled = true;
     this.facingLeft = false;
+
+    // Zero action state.
+    this.downChargeStart = 0;
+    this.downChargeTier = 0;
+    this.barkUntil = 0;
+    this.lastBarkAt = 0;
 
     this.isRunning = false;
     this.isJumping = false;
@@ -149,6 +164,7 @@ export class PlayerMain extends Phaser.GameObjects.Container {
       S: Phaser.Input.Keyboard.KeyCodes.S,
       D: Phaser.Input.Keyboard.KeyCodes.D,
       F: Phaser.Input.Keyboard.KeyCodes.F,
+      B: Phaser.Input.Keyboard.KeyCodes.B,
       SPACE: Phaser.Input.Keyboard.KeyCodes.SPACE
     });
   }
@@ -198,17 +214,44 @@ export class PlayerMain extends Phaser.GameObjects.Container {
   }
 
   updateAnimation() {
-    let anim = 'idle';
-    if (this.isJumping) {
-      anim = 'jump';
-    } else if (this.isRunning) {
-      anim = 'run';
+    let anim;
+    if (this.isZero) {
+      // Zero: bark pose briefly after barking; leaping uses his normal jump frame;
+      // downward-dog while ducking; lying down when idle.
+      if (this.scene.time.now < this.barkUntil) {
+        anim = 'bark';
+      } else if (this.isJumping) {
+        anim = 'jump';
+      } else if (this.isDucking) {
+        anim = 'downdog';
+      } else if (this.isRunning) {
+        anim = 'run';
+      } else {
+        anim = 'lie';
+      }
+    } else {
+      anim = 'idle';
+      if (this.isJumping) {
+        anim = 'jump';
+      } else if (this.isRunning) {
+        anim = 'run';
+      }
     }
     this.sprite.play(`${this.mainCharacter}-${anim}`, true);
     this.refreshSprite();
 
     const invuln = this.invincible || this.scene.time.now < this.invulnUntil;
     this.sprite.setAlpha(invuln && Math.floor(this.scene.time.now / 100) % 2 === 0 ? 0.4 : 1);
+
+    // Zero's charge flash: red at 1.5x, blue at 2x while holding downward dog.
+    if (this.isZero) {
+      const tier = this.downChargeTier || 0;
+      if (tier > 0 && this.body.blocked.down && Math.floor(this.scene.time.now / 110) % 2 === 0) {
+        this.sprite.setTint(tier === 2 ? 0x5b8cff : 0xff5555);
+      } else {
+        this.sprite.clearTint();
+      }
+    }
   }
 
   update() {
@@ -268,13 +311,32 @@ export class PlayerMain extends Phaser.GameObjects.Container {
       this.setStandingBody();
     } else {
       // Ground jumping (+ double jump) and variable jump height.
-      if (this.body.blocked.down) {
+      const grounded = this.body.blocked.down;
+      if (grounded) {
         this.jumpsUsed = 0;
       }
+
+      // Zero's downward-dog charge: hold down (grounded) to charge, then jump to
+      // launch. 1s -> red -> 1.5x; 2s -> blue -> 2x.
+      let jumpBoost = 1;
+      if (this.isZero) {
+        if (grounded && down) {
+          if (!this.downChargeStart) {
+            this.downChargeStart = this.scene.time.now;
+          }
+        } else if (!jumpPressed) {
+          this.downChargeStart = 0;
+        }
+        const held = this.downChargeStart ? this.scene.time.now - this.downChargeStart : 0;
+        this.downChargeTier = held >= DOWNDOG_BLUE_MS ? 2 : held >= DOWNDOG_RED_MS ? 1 : 0;
+        jumpBoost = this.downChargeTier === 2 ? DOWNDOG_BLUE_MULT : this.downChargeTier === 1 ? DOWNDOG_RED_MULT : 1;
+      }
+
       if (jumpPressed) {
-        if (this.body.blocked.down) {
-          this.body.setVelocityY(JUMP_VELOCITY * this.jumpMult);
+        if (grounded) {
+          this.body.setVelocityY(JUMP_VELOCITY * this.jumpMult * jumpBoost);
           this.jumpsUsed = 1;
+          this.downChargeStart = 0; // spend the charge
         } else if (this.jumpsUsed < 2) {
           // Universal double jump: everyone gets a second mid-air jump.
           this.body.setVelocityY(JUMP_VELOCITY * this.jumpMult);
@@ -312,7 +374,25 @@ export class PlayerMain extends Phaser.GameObjects.Container {
       }
     }
 
+    // Bark (Zero only): a short-range damage burst radiating from his front.
+    if (this.isZero) {
+      const barkPressed = Phaser.Input.Keyboard.JustDown(keys.B) || vi.barkEdge;
+      vi.barkEdge = false;
+      if (barkPressed && this.scene.time.now - this.lastBarkAt > BARK_COOLDOWN) {
+        this.lastBarkAt = this.scene.time.now;
+        this.barkUntil = this.scene.time.now + BARK_ANIM_MS;
+        if (typeof this.scene.zeroBark === 'function') {
+          this.scene.zeroBark(this);
+        }
+      }
+    }
+
     this.updateAnimation();
+  }
+
+  // On-screen display width of the sprite (used for the bark reach).
+  spriteWidth() {
+    return this.sprite.displayWidth;
   }
 
   bounce() {
@@ -331,6 +411,10 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.isJumping = false;
     this.isDucking = false;
     this.jumpsUsed = 0;
+    this.downChargeStart = 0;
+    this.downChargeTier = 0;
+    this.barkUntil = 0;
+    this.sprite.clearTint();
     this.setStandingBody();
     this.refreshSprite();
     this.sprite.play(`${this.mainCharacter}-idle`, true);
