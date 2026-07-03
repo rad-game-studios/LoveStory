@@ -1,5 +1,5 @@
 import { submitScore, getTopScores, leaderboardIsShared } from '../services/leaderboard.js';
-import { markGameBeaten, saveLastScorecard } from '../services/progress.js';
+import { markGameBeaten, saveLastScorecard, isZeroUnlocked, markZeroUnlocked } from '../services/progress.js';
 import { isTouchDevice } from '../ui/touchControls.js';
 import { addFullscreenButton } from '../ui/fullscreen.js';
 import { createScrollList } from '../ui/scrollList.js';
@@ -25,6 +25,11 @@ export class EndScene extends Phaser.Scene {
     markGameBeaten();
     // Keep this run's scorecard so it can be viewed again from stage select.
     saveLastScorecard(this.results);
+    // Beating the game with a big score unlocks Zero as a playable character.
+    const zeroJustUnlocked = (this.results.finalScore || 0) > 3000 && !isZeroUnlocked();
+    if (zeroJustUnlocked) {
+      markZeroUnlocked();
+    }
 
     // Drop the gameplay key captures (W/A/S/D/F, arrows, space) so name entry
     // below reads plain keystrokes without the run's control bindings interfering.
@@ -33,6 +38,11 @@ export class EndScene extends Phaser.Scene {
     this.add.rectangle(W / 2, H / 2, W, H, 0x111827).setOrigin(0.5);
     addFullscreenButton(this);
     this.add.text(W / 2, 30, 'YOU MADE IT!', { fontSize: '36px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
+    if (zeroJustUnlocked) {
+      this.add
+        .text(W / 2, 52, '🐾 Over 3000 points — ZERO is now playable! 🐾', { fontSize: '13px', color: '#86efac', fontStyle: 'bold' })
+        .setOrigin(0.5);
+    }
 
     // Leaderboard + name entry come FIRST so players actually submit; the
     // collectables scorecard follows once they've entered their name.

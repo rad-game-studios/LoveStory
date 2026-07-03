@@ -19,7 +19,7 @@ import { CHARACTERS, DOG, SHEET_KEY, registerCharacterAnims, registerAnimsFor } 
 import { preloadEnemies, registerEnemyAnims } from '../config/enemyConfig.js';
 import { Effects } from '../effects/Effects.js';
 import { setupTouchControls } from '../ui/touchControls.js';
-import { hasBeatenGame } from '../services/progress.js';
+import { hasBeatenGame, isZeroUnlocked, markZeroUnlocked } from '../services/progress.js';
 import engagementImg from '../../art/cutscenes/homer-ring-cutscene.jpeg';
 import sparrowMeetImg from '../../art/cutscenes/ricky-and-denise-meet-at-sparrow.jpeg';
 import thanksImg from '../../art/cutscenes/thanks-for-playing.jpeg';
@@ -104,7 +104,17 @@ export class RunScene extends Phaser.Scene {
 
   create(data = {}) {
     this.mainCharacter = data.mainCharacter || 'ricky';
-    this.partnerCharacter = partnerOf(this.mainCharacter);
+    // Playing as Zero: Ricky AND Denise trail behind, no separate dog companion.
+    // Playing as Ricky/Denise: the other partner mirrors, and Zero joins as the
+    // dog companion at his stage.
+    if (this.mainCharacter === 'zero') {
+      this.mirrorChars = ['ricky', 'denise'];
+      this.hasDogCompanion = false;
+    } else {
+      this.partnerCharacter = partnerOf(this.mainCharacter);
+      this.mirrorChars = [this.partnerCharacter];
+      this.hasDogCompanion = true;
+    }
     // Difficulty chosen after the splash (persisted on the game registry).
     // 'veryEasy' = unlimited health + gentle pit recovery; 'normal' = standard.
     this.difficulty = this.registry.get('difficulty') || 'normal';
@@ -256,30 +266,41 @@ export class RunScene extends Phaser.Scene {
   buildPlayers() {
     const startX = this.startX;
     this.playerMain = new PlayerMain(this, startX, this.spawnY, this.mainCharacter);
-    this.playerMirror = new PlayerMirror(this, startX + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y, this.partnerCharacter, {
-      trail: 40,
-      offsetY: MIRROR_OFFSET_Y,
-      facesRight: false,
-      board: true,
-      alpha: 0.85
-    });
-    // Partner (Denise) is hidden on the first playthrough until the Sparrow Bar;
-    // after the game is beaten mirrorIndex is 0, so she rides along from the start.
-    this.playerMirror.setVisible(this.startSegment >= this.mirrorIndex);
-    // Zero the dog: trails further behind, faces right, mimics size. Hidden
-    // until the player reaches the "meet Zero" stage.
-    this.zero = new PlayerMirror(this, startX - 95, this.spawnY, 'dog', {
-      trail: 95,
-      offsetY: 0,
-      facesRight: true,
-      board: false,
-      alpha: 1
-    });
-    this.zero.setVisible(this.zeroIndex >= 0 && this.startSegment >= this.zeroIndex);
-
     this.playerMain.setDepth(8);
-    this.playerMirror.setDepth(7);
-    this.zero.setDepth(7);
+
+    // Cosmetic partners trailing behind (one for Ricky/Denise; both for Zero, at
+    // staggered distances). Hidden on the first playthrough until the Sparrow Bar;
+    // after the game is beaten mirrorIndex is 0, so they ride along from the start.
+    const trails = [40, 80];
+    this.mirrors = this.mirrorChars.map((char, i) => {
+      const m = new PlayerMirror(this, startX + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y, char, {
+        trail: trails[i] ?? 40 + i * 40,
+        offsetY: MIRROR_OFFSET_Y,
+        facesRight: false,
+        board: true,
+        alpha: 0.85
+      });
+      m.setVisible(this.startSegment >= this.mirrorIndex);
+      m.setDepth(7);
+      return m;
+    });
+
+    // Zero the dog companion (only when NOT playing as Zero): trails further
+    // behind, faces right, mimics size. Hidden until the "meet Zero" stage.
+    if (this.hasDogCompanion) {
+      this.zero = new PlayerMirror(this, startX - 95, this.spawnY, 'dog', {
+        trail: 95,
+        offsetY: 0,
+        facesRight: true,
+        board: false,
+        alpha: 1
+      });
+      this.zero.setVisible(this.zeroIndex >= 0 && this.startSegment >= this.zeroIndex);
+      this.zero.setDepth(7);
+    } else {
+      this.zero = null;
+    }
+
     this.physics.add.collider(this.playerMain, this.floorPieces);
   }
 
@@ -557,7 +578,13 @@ export class RunScene extends Phaser.Scene {
 
     // Record themed coin-box collectables (e.g. 🌀) on the scorecard.
     if (cfg && this.collectableStats[block.segmentIndex] && this.collectableStats[block.segmentIndex][block.statKey]) {
-      this.collectableStats[block.segmentIndex][block.statKey].collected += 1;
+      const stat = this.collectableStats[block.segmentIndex][block.statKey];
+      stat.collected += 1;
+      // Collecting all three blue coins on Zero's stage unlocks him as playable.
+      if (block.statKey === '🌀' && stat.collected >= stat.total && !isZeroUnlocked()) {
+        markZeroUnlocked();
+        this.flashingBanner('🐾  ZERO UNLOCKED!  🐾', { y: 130, duration: 3200, fontSize: '24px' });
+      }
     }
 
     // Floating pickup — the emoji for themed coins, otherwise the coin sprite.
@@ -1174,7 +1201,7 @@ export class RunScene extends Phaser.Scene {
       if (this.difficulty === 'veryEasy') {
         const rx = this.pitRecoverX(this.playerMain.x);
         this.playerMain.reset(rx, this.spawnY);
-        this.playerMirror.reset(rx + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y);
+        this.mirrors.forEach((m) => m.reset(rx + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y));
         return;
       }
       const result = this.playerMain.hurt();
@@ -1207,7 +1234,7 @@ export class RunScene extends Phaser.Scene {
     // Introduce Denise when reaching her stage (first playthrough); she follows
     // for the rest of the run. After the game is beaten mirrorIndex is 0.
     if (this.mirrorIndex >= 0 && this.currentIndex >= this.mirrorIndex) {
-      this.playerMirror.setVisible(true);
+      this.mirrors.forEach((m) => m.setVisible(true));
     }
 
     // "How they met" cutscene on arriving at the Sparrow Bar (plays once).
@@ -1215,8 +1242,9 @@ export class RunScene extends Phaser.Scene {
       this.playSparrowCutscene();
     }
 
-    // Introduce Zero when reaching his stage; he follows for the rest of the run.
-    if (this.zeroIndex >= 0 && this.currentIndex >= this.zeroIndex) {
+    // Introduce Zero the dog when reaching his stage; he follows for the rest of
+    // the run. Skipped when you're already playing as Zero.
+    if (this.zero && this.zeroIndex >= 0 && this.currentIndex >= this.zeroIndex) {
       this.zero.setVisible(true);
       if (!this.zeroIntroShown) {
         this.zeroIntroShown = true;
@@ -1290,7 +1318,7 @@ export class RunScene extends Phaser.Scene {
     const x = this.segmentStartX(idx) + 80;
     this.playerMain.setPosition(x, this.spawnY);
     this.playerMain.body.reset(x, this.spawnY);
-    this.playerMirror.setPosition(x + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y);
+    this.mirrors.forEach((m) => m.setPosition(x + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y));
     this.cameras.main.centerOn(x, VIEW_HEIGHT / 2);
   }
 
@@ -1347,7 +1375,7 @@ export class RunScene extends Phaser.Scene {
   softRespawn() {
     const cx = this.checkpointX();
     this.playerMain.reset(cx, this.spawnY);
-    this.playerMirror.reset(cx + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y);
+    this.mirrors.forEach((m) => m.reset(cx + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y));
   }
 
   // Full reset: lose the power-up (back to base), return to the checkpoint, and
@@ -1359,7 +1387,7 @@ export class RunScene extends Phaser.Scene {
     this.playerMain.applyPowerUp(null);
     const cx = this.checkpointX();
     this.playerMain.reset(cx, this.spawnY);
-    this.playerMirror.reset(cx + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y);
+    this.mirrors.forEach((m) => m.reset(cx + MIRROR_OFFSET_X, this.spawnY + MIRROR_OFFSET_Y));
     this.obstacles.forEach((o) => o.reset());
     this.platforms.forEach((p) => p.reset());
     this.movingPlatforms.forEach((m) => m.reset());

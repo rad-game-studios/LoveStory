@@ -1,8 +1,9 @@
 import { CHARACTERS, PORTRAIT_KEY } from '../config/characterConfig.js';
 import { addFullscreenButton } from '../ui/fullscreen.js';
+import { isZeroUnlocked } from '../services/progress.js';
 
 const FIRST_SCENE = 'HowToScene';
-const PORTRAIT_SIZE = 200;
+const LABELS = { ricky: 'RICKY', denise: 'DENISE', zero: 'ZERO' };
 
 export class TitleScene extends Phaser.Scene {
   constructor() {
@@ -18,58 +19,59 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create() {
-    this.selected = 'ricky';
-
     this.add.rectangle(480, 270, 960, 540, 0x111827).setOrigin(0.5);
     addFullscreenButton(this);
-    this.add.text(480, 96, 'LOVE STORY', { fontSize: '52px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(480, 158, 'Choose your runner', { fontSize: '24px', color: '#fef3c7' }).setOrigin(0.5);
+    this.add.text(480, 90, 'LOVE STORY', { fontSize: '52px', color: '#fef3c7', fontStyle: 'bold' }).setOrigin(0.5);
+    this.add.text(480, 150, 'Choose your runner', { fontSize: '24px', color: '#fef3c7' }).setOrigin(0.5);
 
-    this.rickyHL = this.makeHighlight(320, 330);
-    this.deniseHL = this.makeHighlight(640, 330);
+    // Ricky and Denise always; Zero once he's been unlocked.
+    this.characters = ['ricky', 'denise'];
+    if (isZeroUnlocked()) {
+      this.characters.push('zero');
+    }
 
-    this.rickyButton = this.makePortrait(320, 330, 'ricky');
-    this.deniseButton = this.makePortrait(640, 330, 'denise');
+    const n = this.characters.length;
+    const size = n >= 3 ? 176 : 200;
+    const spacing = n >= 3 ? 250 : 320;
+    const startX = 480 - ((n - 1) / 2) * spacing;
+    const y = 330;
 
-    this.add.text(320, 458, 'RICKY', { fontSize: '24px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(640, 458, 'DENISE', { fontSize: '24px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+    this.highlights = this.characters.map((key, i) => {
+      const x = startX + i * spacing;
+      const hl = this.add
+        .rectangle(x, y, size + 16, size + 16, 0x000000, 0)
+        .setStrokeStyle(6, 0xfef3c7)
+        .setVisible(false);
+      const img = this.add
+        .image(x, y, PORTRAIT_KEY(key))
+        .setDisplaySize(size, size)
+        .setInteractive({ useHandCursor: true });
+      img.on('pointerover', () => this.select(i));
+      img.on('pointerdown', () => this.startGame(key));
+      this.add.text(x, y + size / 2 + 28, LABELS[key] || key.toUpperCase(), { fontSize: '24px', color: '#ffffff', fontStyle: 'bold' }).setOrigin(0.5);
+      return hl;
+    });
 
     this.add
       .text(480, 500, 'Arrow keys to choose · Enter / click to start', { fontSize: '18px', color: '#9ca3af' })
       .setOrigin(0.5);
 
     const keyboard = this.input.keyboard;
-    keyboard.on('keydown-LEFT', () => this.select('ricky'));
-    keyboard.on('keydown-A', () => this.select('ricky'));
-    keyboard.on('keydown-RIGHT', () => this.select('denise'));
-    keyboard.on('keydown-D', () => this.select('denise'));
-    keyboard.on('keydown-ENTER', () => this.startGame(this.selected));
-    keyboard.on('keydown-SPACE', () => this.startGame(this.selected));
+    keyboard.on('keydown-LEFT', () => this.select(this.selected - 1));
+    keyboard.on('keydown-A', () => this.select(this.selected - 1));
+    keyboard.on('keydown-RIGHT', () => this.select(this.selected + 1));
+    keyboard.on('keydown-D', () => this.select(this.selected + 1));
+    keyboard.on('keydown-ENTER', () => this.startGame(this.characters[this.selected]));
+    keyboard.on('keydown-SPACE', () => this.startGame(this.characters[this.selected]));
 
-    this.select('ricky');
+    this.selected = 0;
+    this.select(0);
   }
 
-  makeHighlight(x, y) {
-    return this.add
-      .rectangle(x, y, PORTRAIT_SIZE + 16, PORTRAIT_SIZE + 16, 0x000000, 0)
-      .setStrokeStyle(6, 0xfef3c7)
-      .setVisible(false);
-  }
-
-  makePortrait(x, y, character) {
-    const img = this.add
-      .image(x, y, PORTRAIT_KEY(character))
-      .setDisplaySize(PORTRAIT_SIZE, PORTRAIT_SIZE)
-      .setInteractive({ useHandCursor: true });
-    img.on('pointerover', () => this.select(character));
-    img.on('pointerdown', () => this.startGame(character));
-    return img;
-  }
-
-  select(character) {
-    this.selected = character;
-    this.rickyHL.setVisible(character === 'ricky');
-    this.deniseHL.setVisible(character === 'denise');
+  select(index) {
+    const n = this.characters.length;
+    this.selected = ((index % n) + n) % n; // wrap around
+    this.highlights.forEach((hl, i) => hl.setVisible(i === this.selected));
   }
 
   startGame(character) {

@@ -1,4 +1,4 @@
-import { SHEET_KEY, SPRITE_DISPLAY_HEIGHT, FRAME_HEIGHT } from '../config/characterConfig.js';
+import { CHARACTERS, SHEET_KEY, SPRITE_DISPLAY_HEIGHT, FRAME_HEIGHT } from '../config/characterConfig.js';
 
 const WIDTH = 34;
 const HEIGHT = 48;
@@ -35,6 +35,8 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.scene.add.existing(this);
 
     this.mainCharacter = mainCharacter;
+    // Zero's art faces right by default; the humans face left.
+    this.facesRight = Boolean(CHARACTERS[mainCharacter] && CHARACTERS[mainCharacter].facesRight);
     this.controlsEnabled = true;
     this.facingLeft = false;
 
@@ -175,7 +177,7 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     } else {
       this.sprite.setScale(s);
     }
-    this.sprite.setFlipX(!this.facingLeft);
+    this.sprite.setFlipX(this.facesRight ? this.facingLeft : !this.facingLeft);
 
     // Park the chevron just above the character's head (scales with size).
     const displayH = this.isDucking ? SPRITE_DISPLAY_HEIGHT * this.sizeMult * (DUCK_HEIGHT / HEIGHT) : SPRITE_DISPLAY_HEIGHT * this.sizeMult;

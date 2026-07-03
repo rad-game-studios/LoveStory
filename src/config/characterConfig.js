@@ -44,6 +44,21 @@ export const CHARACTERS = {
       run: { frames: [1, 2, 3, 4], frameRate: 10, repeat: -1 },
       jump: { frames: [5], frameRate: 1, repeat: -1 }
     }
+  },
+  // Zero the dog — an unlockable third playable character. Reuses the dog art
+  // (which faces RIGHT, unlike the left-facing humans).
+  zero: {
+    key: 'zero',
+    sheet: dogSheet,
+    portrait: dogPortrait,
+    frameWidth: FRAME_WIDTH,
+    frameHeight: FRAME_HEIGHT,
+    facesRight: true,
+    anims: {
+      idle: { frames: [0], frameRate: 1, repeat: -1 },
+      run: { frames: [1, 2, 3, 4], frameRate: 10, repeat: -1 },
+      jump: { frames: [5], frameRate: 1, repeat: -1 }
+    }
   }
 };
 
