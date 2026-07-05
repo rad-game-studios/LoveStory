@@ -117,6 +117,7 @@ export class Enemy extends Phaser.GameObjects.Sprite {
       this.play(this.anim);
     }
     scene.events.on('update', this.update, this);
+    this.once('destroy', () => this.scene && this.scene.events.off('update', this.update, this));
   }
 
   update() {

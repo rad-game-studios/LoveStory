@@ -1478,10 +1478,12 @@ export class RunScene extends Phaser.Scene {
       return;
     }
     const partyIndex = SEGMENTS.findIndex((s) => s.key === 'williamsburgParty');
-    if (partyIndex < 0) {
+    if (partyIndex < 0 || !this.segStarts) {
       return;
     }
-    const bx = this.worldWidth - 300;
+    // Placed at the end of the Church (just before the Party begins) so the flow
+    // is Church -> Bonus -> Party.
+    const bx = this.segStarts[partyIndex] - 260;
     const by = this.groundTop - 74;
     this.bonusPlatform = this.add
       .rectangle(bx, by, 170, 22, 0x3b82f6)

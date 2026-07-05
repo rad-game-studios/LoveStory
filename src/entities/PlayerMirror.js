@@ -25,6 +25,9 @@ export class PlayerMirror extends Phaser.GameObjects.Container {
 
     this.createVisuals();
     this.scene.events.on('update', this.update, this);
+    // Stop updating once destroyed so a scene restart (e.g. returning from the
+    // bonus level) doesn't fire this on a torn-down scene.
+    this.once('destroy', () => this.scene && this.scene.events.off('update', this.update, this));
   }
 
   createVisuals() {
@@ -50,6 +53,9 @@ export class PlayerMirror extends Phaser.GameObjects.Container {
   }
 
   update() {
+    if (!this.scene) {
+      return;
+    }
     const main = this.scene.playerMain;
     if (!main || !this.visible) {
       return;

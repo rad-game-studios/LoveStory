@@ -81,6 +81,7 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.applyPowerUp(null); // base state (sets gravity, size, body, flags)
 
     this.scene.events.on('update', this.update, this);
+    this.once('destroy', () => this.scene && this.scene.events.off('update', this.update, this));
   }
 
   createVisuals() {
