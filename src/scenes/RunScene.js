@@ -117,6 +117,8 @@ export class RunScene extends Phaser.Scene {
     // Playing as Ricky/Denise: the other partner mirrors, and Zero joins as the
     // dog companion at his stage.
     this.isZero = this.mainCharacter === 'zero';
+    // Once the bonus is used it can't be re-entered this run (no coin farming).
+    this.bonusUsed = Boolean(data.bonusUsed);
     if (this.isZero) {
       this.mirrorChars = ['ricky', 'denise'];
       this.hasDogCompanion = false;
@@ -1137,6 +1139,7 @@ export class RunScene extends Phaser.Scene {
       .setShadow(2, 2, '#000000', 4);
 
     this.refreshTimer();
+    this.refreshScore(); // reflect any score carried over from the bonus round
   }
 
   // In Very Easy the player can't die from hits, so show an infinity marker
@@ -1474,7 +1477,9 @@ export class RunScene extends Phaser.Scene {
   // A blue platform near the end of the party (Zero only). A max-charge (2s) jump
   // off it launches Zero into the bonus round.
   buildBonusPlatform() {
-    if (!this.isZero) {
+    // Clear any stale reference (Phaser reuses the scene instance on restart).
+    this.bonusPlatform = null;
+    if (!this.isZero || this.bonusUsed) {
       return;
     }
     const partyIndex = SEGMENTS.findIndex((s) => s.key === 'williamsburgParty');

@@ -168,7 +168,8 @@ export class BonusScene extends Phaser.Scene {
           carryScore: (d.carryScore || 0) + this.bonusCoins * COIN_POINTS,
           carryCoins: (d.carryCoins || 0) + this.bonusCoins,
           carryEnemies: d.carryEnemies || 0,
-          carryTime: d.carryTime
+          carryTime: d.carryTime,
+          bonusUsed: true // one bonus per run — don't rebuild the platform
         });
       });
     });
