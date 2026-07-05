@@ -116,7 +116,8 @@ export class RunScene extends Phaser.Scene {
     // Playing as Zero: Ricky AND Denise trail behind, no separate dog companion.
     // Playing as Ricky/Denise: the other partner mirrors, and Zero joins as the
     // dog companion at his stage.
-    if (this.mainCharacter === 'zero') {
+    this.isZero = this.mainCharacter === 'zero';
+    if (this.isZero) {
       this.mirrorChars = ['ricky', 'denise'];
       this.hasDogCompanion = false;
     } else {
@@ -129,10 +130,11 @@ export class RunScene extends Phaser.Scene {
     this.difficulty = this.registry.get('difficulty') || 'normal';
     this.transitioning = false;
     this.currentIndex = 0;
-    this.coinsCollected = 0;
-    this.enemiesDefeated = 0;
-    this.baseScore = 0;
-    this.timeRemaining = START_TIME;
+    // Score/time carry over from the bonus round when returning from it.
+    this.coinsCollected = data.carryCoins || 0;
+    this.enemiesDefeated = data.carryEnemies || 0;
+    this.baseScore = data.carryScore || 0;
+    this.timeRemaining = data.carryTime != null ? data.carryTime : START_TIME;
     this.groundTop = VIEW_HEIGHT - GROUND_HEIGHT;
     this.spawnY = this.groundTop - 24;
 
@@ -183,6 +185,7 @@ export class RunScene extends Phaser.Scene {
     this.buildGameplay();
     this.buildCheckpoints();
     this.buildEndTrigger();
+    this.buildBonusPlatform();
     this.buildHud();
 
     this.effects = new Effects(this);
@@ -1466,6 +1469,69 @@ export class RunScene extends Phaser.Scene {
     this.projectiles.clear(true, true);
     this.fireballs.clear(true, true);
     if (this.alienPulses) this.alienPulses.clear(true, true);
+  }
+
+  // A blue platform near the end of the party (Zero only). A max-charge (2s) jump
+  // off it launches Zero into the bonus round.
+  buildBonusPlatform() {
+    if (!this.isZero) {
+      return;
+    }
+    const partyIndex = SEGMENTS.findIndex((s) => s.key === 'williamsburgParty');
+    if (partyIndex < 0) {
+      return;
+    }
+    const bx = this.worldWidth - 300;
+    const by = this.groundTop - 74;
+    this.bonusPlatform = this.add
+      .rectangle(bx, by, 170, 22, 0x3b82f6)
+      .setStrokeStyle(3, 0x93c5fd)
+      .setDepth(6);
+    this.physics.add.existing(this.bonusPlatform, true);
+    this.physics.add.collider(this.playerMain, this.bonusPlatform);
+    this.add
+      .text(bx, by - 34, '★ BONUS ★\nmax-charge jump here!', {
+        fontSize: '12px',
+        color: '#bfdbfe',
+        fontStyle: 'bold',
+        align: 'center'
+      })
+      .setOrigin(0.5)
+      .setDepth(6);
+    this.tweens.add({ targets: this.bonusPlatform, alpha: { from: 1, to: 0.55 }, duration: 700, yoyo: true, repeat: -1 });
+  }
+
+  // Called by PlayerMain when Zero fires a fully-charged (2x) jump. If he launched
+  // from the bonus platform, warp to the bonus round.
+  onZeroMaxJump(player) {
+    if (!this.bonusPlatform || this.transitioning) {
+      return;
+    }
+    const plat = this.bonusPlatform;
+    const withinX = Math.abs(player.x - plat.x) <= plat.width / 2 + 16;
+    const nearY = player.y <= plat.y + 20 && player.y >= plat.y - 170;
+    if (withinX && nearY) {
+      this.startBonus();
+    }
+  }
+
+  startBonus() {
+    if (this.transitioning) {
+      return;
+    }
+    this.transitioning = true;
+    this.playerMain.setControlsEnabled(false);
+    const partyIndex = SEGMENTS.findIndex((s) => s.key === 'williamsburgParty');
+    const carry = {
+      mainCharacter: this.mainCharacter,
+      startSegment: partyIndex,
+      carryScore: this.baseScore,
+      carryCoins: this.coinsCollected,
+      carryEnemies: this.enemiesDefeated,
+      carryTime: this.timeRemaining
+    };
+    this.cameras.main.fadeOut(400);
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('BonusScene', carry));
   }
 
   handleEnd() {

@@ -19,6 +19,12 @@ const DOWNDOG_RED_MULT = 1.5;
 const DOWNDOG_BLUE_MULT = 2;
 const BARK_COOLDOWN = 500;
 const BARK_ANIM_MS = 300;
+// Releasing the downward-dog charge (without jumping) launches a sprint instead:
+// tier 1 -> 1.5x run; tier 2 -> 3x for 2s, then 1.5x.
+const SPRINT_TIER1_MULT = 1.5;
+const SPRINT_BURST_MULT = 3;
+const SPRINT_BURST_MS = 2000;
+const SPRINT_TAIL_MS = 3000;
 
 // Power-up effects. Only one is active at a time — collecting a special resets
 // to base and applies the new one (Mario-style). Unset fields default to base.
@@ -54,6 +60,9 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.downChargeTier = 0;
     this.barkUntil = 0;
     this.lastBarkAt = 0;
+    this.wasDown = false;
+    this.sprintUntil = 0;
+    this.sprintBurstUntil = 0;
 
     this.isRunning = false;
     this.isJumping = false;
@@ -289,9 +298,20 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     // Consume the one-shot touch edges.
     vi.jumpEdge = false;
     vi.jumpReleasedEdge = false;
+    const downReleased = this.wasDown && !down;
+    this.wasDown = down;
 
-    // Horizontal movement.
-    const speed = RUN_SPEED * this.speedMult;
+    // Horizontal movement (Zero gets a sprint multiplier from a released charge).
+    let sprintMult = 1;
+    if (this.isZero) {
+      const now = this.scene.time.now;
+      if (now < this.sprintBurstUntil) {
+        sprintMult = SPRINT_BURST_MULT;
+      } else if (now < this.sprintUntil) {
+        sprintMult = SPRINT_TIER1_MULT;
+      }
+    }
+    const speed = RUN_SPEED * this.speedMult * sprintMult;
     let velocityX = 0;
     if (movingRight && !movingLeft) {
       velocityX = speed;
@@ -316,26 +336,38 @@ export class PlayerMain extends Phaser.GameObjects.Container {
         this.jumpsUsed = 0;
       }
 
-      // Zero's downward-dog charge: hold down (grounded) to charge, then jump to
-      // launch. 1s -> red -> 1.5x; 2s -> blue -> 2x.
+      // Zero's downward-dog charge: hold down (grounded) to charge, then either
+      // jump (1s -> red -> 1.5x height; 2s -> blue -> 2x) or release without
+      // jumping to launch a sprint (1s -> 1.5x run; 2s -> 3x for 2s then 1.5x).
       let jumpBoost = 1;
       if (this.isZero) {
+        const held = this.downChargeStart ? this.scene.time.now - this.downChargeStart : 0;
+        const tier = held >= DOWNDOG_BLUE_MS ? 2 : held >= DOWNDOG_RED_MS ? 1 : 0;
+        jumpBoost = tier === 2 ? DOWNDOG_BLUE_MULT : tier === 1 ? DOWNDOG_RED_MULT : 1;
+        this.downChargeTier = grounded && down ? tier : 0;
+
         if (grounded && down) {
           if (!this.downChargeStart) {
             this.downChargeStart = this.scene.time.now;
           }
-        } else if (!jumpPressed) {
-          this.downChargeStart = 0;
+        } else {
+          if (downReleased && grounded && tier >= 1 && !jumpPressed) {
+            this.startSprint(tier);
+          }
+          if (!jumpPressed) {
+            this.downChargeStart = 0;
+          }
         }
-        const held = this.downChargeStart ? this.scene.time.now - this.downChargeStart : 0;
-        this.downChargeTier = held >= DOWNDOG_BLUE_MS ? 2 : held >= DOWNDOG_RED_MS ? 1 : 0;
-        jumpBoost = this.downChargeTier === 2 ? DOWNDOG_BLUE_MULT : this.downChargeTier === 1 ? DOWNDOG_RED_MULT : 1;
       }
 
       if (jumpPressed) {
         if (grounded) {
           this.body.setVelocityY(JUMP_VELOCITY * this.jumpMult * jumpBoost);
           this.jumpsUsed = 1;
+          // Max-charge jump on a bonus platform launches Zero into the bonus level.
+          if (this.isZero && jumpBoost >= DOWNDOG_BLUE_MULT && typeof this.scene.onZeroMaxJump === 'function') {
+            this.scene.onZeroMaxJump(this);
+          }
           this.downChargeStart = 0; // spend the charge
         } else if (this.jumpsUsed < 2) {
           // Universal double jump: everyone gets a second mid-air jump.
@@ -399,6 +431,17 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.body.setVelocityY(STOMP_BOUNCE);
   }
 
+  startSprint(tier) {
+    const now = this.scene.time.now;
+    if (tier >= 2) {
+      this.sprintBurstUntil = now + SPRINT_BURST_MS; // 3x
+      this.sprintUntil = this.sprintBurstUntil + SPRINT_TAIL_MS; // then 1.5x
+    } else {
+      this.sprintBurstUntil = 0;
+      this.sprintUntil = now + SPRINT_TAIL_MS; // 1.5x
+    }
+  }
+
   reset(x, y) {
     // Place feet on the ground regardless of current size.
     const feetGround = y + HEIGHT / 2;
@@ -414,6 +457,9 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.downChargeStart = 0;
     this.downChargeTier = 0;
     this.barkUntil = 0;
+    this.wasDown = false;
+    this.sprintUntil = 0;
+    this.sprintBurstUntil = 0;
     this.sprite.clearTint();
     this.setStandingBody();
     this.refreshSprite();

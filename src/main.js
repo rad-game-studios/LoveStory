@@ -14,9 +14,10 @@ const { TitleScene } = await import('./scenes/TitleScene.js');
 const { HowToScene } = await import('./scenes/HowToScene.js');
 const { StageSelectScene } = await import('./scenes/StageSelectScene.js');
 const { RunScene } = await import('./scenes/RunScene.js');
+const { BonusScene } = await import('./scenes/BonusScene.js');
 const { EndScene } = await import('./scenes/EndScene.js');
 
-gameConfig.scene = [SplashScene, DifficultyScene, TitleScene, HowToScene, StageSelectScene, RunScene, EndScene];
+gameConfig.scene = [SplashScene, DifficultyScene, TitleScene, HowToScene, StageSelectScene, RunScene, BonusScene, EndScene];
 
 const game = new Phaser.Game(gameConfig);
 
