@@ -17,6 +17,9 @@ const DOWNDOG_RED_MS = 1000; // hold down 1s -> red -> 1.5x jump
 const DOWNDOG_BLUE_MS = 2000; // hold down 2s -> blue -> 2x jump
 const DOWNDOG_RED_MULT = 1.5;
 const DOWNDOG_BLUE_MULT = 2;
+// After releasing the charge you keep the super jump for this long (no need to
+// hold down while pressing jump).
+const CHARGE_GRACE_MS = 1000;
 const BARK_COOLDOWN = 500;
 const BARK_ANIM_MS = 300;
 // Releasing the downward-dog charge (without jumping) launches a sprint instead:
@@ -63,6 +66,8 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.wasDown = false;
     this.sprintUntil = 0;
     this.sprintBurstUntil = 0;
+    this.bufferedTier = 0;
+    this.chargeBufferUntil = 0;
 
     this.isRunning = false;
     this.isJumping = false;
@@ -337,28 +342,35 @@ export class PlayerMain extends Phaser.GameObjects.Container {
         this.jumpsUsed = 0;
       }
 
-      // Zero's downward-dog charge: hold down (grounded) to charge, then either
-      // jump (1s -> red -> 1.5x height; 2s -> blue -> 2x) or release without
-      // jumping to launch a sprint (1s -> 1.5x run; 2s -> 3x for 2s then 1.5x).
+      // Zero's downward-dog charge: hold down (grounded) to charge, then jump for
+      // a super jump (1s -> red -> 1.5x; 2s -> blue -> 2x). You don't have to keep
+      // down held — after releasing, the super jump stays buffered for a 1s grace
+      // window, and releasing also launches a sprint (1s -> 1.5x run; 2s -> 3x/2s).
       let jumpBoost = 1;
       if (this.isZero) {
-        const held = this.downChargeStart ? this.scene.time.now - this.downChargeStart : 0;
+        const now = this.scene.time.now;
+        const held = this.downChargeStart ? now - this.downChargeStart : 0;
         const tier = held >= DOWNDOG_BLUE_MS ? 2 : held >= DOWNDOG_RED_MS ? 1 : 0;
-        jumpBoost = tier === 2 ? DOWNDOG_BLUE_MULT : tier === 1 ? DOWNDOG_RED_MULT : 1;
-        this.downChargeTier = grounded && down ? tier : 0;
 
         if (grounded && down) {
           if (!this.downChargeStart) {
-            this.downChargeStart = this.scene.time.now;
+            this.downChargeStart = now;
           }
         } else {
-          if (downReleased && grounded && tier >= 1 && !jumpPressed) {
+          if (downReleased && grounded && tier >= 1) {
+            this.bufferedTier = tier; // buffer the super jump for the grace window
+            this.chargeBufferUntil = now + CHARGE_GRACE_MS;
             this.startSprint(tier);
           }
-          if (!jumpPressed) {
-            this.downChargeStart = 0;
-          }
+          this.downChargeStart = 0;
         }
+
+        // Effective charge = current hold, or a buffered charge still in its grace
+        // window (so down + jump needn't be pressed together).
+        const graceTier = now < this.chargeBufferUntil ? this.bufferedTier : 0;
+        const effTier = grounded && down ? tier : graceTier;
+        this.downChargeTier = grounded ? effTier : 0; // drives the red/blue flash
+        jumpBoost = effTier === 2 ? DOWNDOG_BLUE_MULT : effTier === 1 ? DOWNDOG_RED_MULT : 1;
       }
 
       if (jumpPressed) {
@@ -370,6 +382,7 @@ export class PlayerMain extends Phaser.GameObjects.Container {
             this.scene.onZeroMaxJump(this);
           }
           this.downChargeStart = 0; // spend the charge
+          this.chargeBufferUntil = 0; // and the buffered grace charge
         } else if (this.jumpsUsed < 2) {
           // Universal double jump: everyone gets a second mid-air jump.
           this.body.setVelocityY(JUMP_VELOCITY * this.jumpMult);
@@ -461,6 +474,8 @@ export class PlayerMain extends Phaser.GameObjects.Container {
     this.wasDown = false;
     this.sprintUntil = 0;
     this.sprintBurstUntil = 0;
+    this.bufferedTier = 0;
+    this.chargeBufferUntil = 0;
     this.sprite.clearTint();
     this.setStandingBody();
     this.refreshSprite();
